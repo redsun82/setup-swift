@@ -128,6 +128,52 @@ function refreshKeysFromServer(server) {
 
 /***/ }),
 
+/***/ 1915:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.tryCleanup = void 0;
+const core = __importStar(__nccwpck_require__(2186));
+const promises_1 = __nccwpck_require__(3292);
+/** Try to clean up the specified path,  */
+async function tryCleanup(path, displayName) {
+    try {
+        await (0, promises_1.rm)(path, { force: true, maxRetries: 3, recursive: true });
+    }
+    catch (e) {
+        core.debug(`Failed to clean up ${displayName}, continuing. Error: ${e}`);
+    }
+}
+exports.tryCleanup = tryCleanup;
+
+
+/***/ }),
+
 /***/ 7419:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -164,6 +210,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const toolCache = __importStar(__nccwpck_require__(7784));
 const swift_versions_1 = __nccwpck_require__(8263);
 const gpg_1 = __nccwpck_require__(9060);
+const io_1 = __nccwpck_require__(1915);
 async function install(version, system) {
     if (os.platform() !== "linux") {
         core.error("Trying to run linux installer on non-linux os");
@@ -196,11 +243,14 @@ async function download({ url, name }) {
     core.debug("Swift download complete");
     return { pkg, signature, name };
 }
+/** Extracts the package, cleaning up the original path and intermediate files. */
 async function unpack(packagePath, packageName, version, system) {
     core.debug("Extracting package");
     let extractPath = await toolCache.extractTar(packagePath);
+    await (0, io_1.tryCleanup)(packagePath, "package archive");
     core.debug("Package extracted");
     let cachedPath = await toolCache.cacheDir(path.join(extractPath, packageName), `swift-${system.name}`, version);
+    await (0, io_1.tryCleanup)(extractPath, "extracted package");
     core.debug("Package cached");
     return cachedPath;
 }
@@ -243,6 +293,7 @@ const toolCache = __importStar(__nccwpck_require__(7784));
 const path = __importStar(__nccwpck_require__(1017));
 const swift_versions_1 = __nccwpck_require__(8263);
 const get_version_1 = __nccwpck_require__(951);
+const io_1 = __nccwpck_require__(1915);
 async function install(version, system) {
     const toolchainName = `swift ${version}`;
     const toolchain = await toolchainVersion(toolchainName);
@@ -279,12 +330,16 @@ async function download({ url }) {
     core.debug("Downloading swift for macOS");
     return toolCache.downloadTool(url);
 }
+/** Extracts the package, cleaning up the original path and intermediate files. */
 async function unpack({ name }, packagePath, version) {
     core.debug("Extracting package");
     const unpackedPath = await toolCache.extractXar(packagePath);
+    await (0, io_1.tryCleanup)(packagePath, `package from ${packagePath}`);
     const extractedPath = await toolCache.extractTar(path.join(unpackedPath, `${name}-package.pkg`, "Payload"));
+    await (0, io_1.tryCleanup)(unpackedPath, `package from ${unpackedPath}`);
     core.debug("Package extracted");
     const cachedPath = await toolCache.cacheDir(extractedPath, "swift-macOS", version);
+    await (0, io_1.tryCleanup)(extractedPath, `extracted package from ${extractedPath}`);
     core.debug("Package cached");
     return cachedPath;
 }
@@ -467,6 +522,8 @@ const semver = __importStar(__nccwpck_require__(1383));
 const core = __importStar(__nccwpck_require__(2186));
 const os_1 = __nccwpck_require__(1855);
 const VERSIONS_LIST = [
+    ["6.0.1", [os_1.OS.MacOS, os_1.OS.Ubuntu]],
+    ["6.0", [os_1.OS.MacOS, os_1.OS.Ubuntu]],
     ["5.10.1", [os_1.OS.MacOS, os_1.OS.Ubuntu]],
     ["5.10", [os_1.OS.MacOS, os_1.OS.Ubuntu]],
     ["5.9.2", [os_1.OS.MacOS, os_1.OS.Ubuntu]],
@@ -793,6 +850,7 @@ const exec_1 = __nccwpck_require__(1514);
 const swift_versions_1 = __nccwpck_require__(8263);
 const gpg_1 = __nccwpck_require__(9060);
 const visual_studio_1 = __nccwpck_require__(5219);
+const io_1 = __nccwpck_require__(1915);
 async function install(version, system) {
     if (os.platform() !== "win32") {
         core.error("Trying to run windows installer on non-windows os");
@@ -806,6 +864,7 @@ async function install(version, system) {
         let { exe, signature } = await download(swiftPkg);
         await (0, gpg_1.verify)(signature, exe);
         const exePath = await toolCache.cacheFile(exe, swiftPkg.name, `swift-${system.name}`, version);
+        await (0, io_1.tryCleanup)(exe, `installer`);
         swiftPath = path.join(exePath, swiftPkg.name);
     }
     else {
@@ -17107,6 +17166,14 @@ module.exports = require("events");
 
 "use strict";
 module.exports = require("fs");
+
+/***/ }),
+
+/***/ 3292:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("fs/promises");
 
 /***/ }),
 
